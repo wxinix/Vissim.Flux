@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="modules\main.cpp" />
+    <ClCompile Include="modules\action_types.ixx">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="modules\middleware_ftp.ixx">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="modules\service_ftp.ixx">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="modules\store_main.ixx">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\core\vissim_flux.ixx">
+      <Filter>modules</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="modules">
+      <UniqueIdentifier>{354dba45-3e14-44f8-b5a9-ae52aebae5e0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

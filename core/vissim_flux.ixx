@@ -13,9 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific
 */
 
-#ifndef VISSIM_FLUX_H
-#define VISSIM_FLUX_H
-
+module;
 #include <any>
 #include <atomic>
 #include <condition_variable>
@@ -26,13 +24,14 @@ See the License for the specific
 #include <type_traits>
 #include <utility>
 #include <vector>
+export module vissim.flux;
 
 namespace vissim_flux {
 
 template<typename E>
 using is_scoped_enum = std::integral_constant<bool, std::is_enum<E>::value && !std::is_convertible<E, int>::value>;
 
-class Action final
+export class Action final
 {
 public:
     template <class ScopedEnum = typename std::enable_if<is_scoped_enum<ScopedEnum>::value>::type>
@@ -76,7 +75,7 @@ private:
     int type_;
 };
 
-class Middleware
+export class Middleware
 {
 public:
     virtual ~Middleware() = default;
@@ -89,7 +88,7 @@ protected:
     Middleware &operator=(Middleware &&) = default;
 };
 
-class Store
+export class Store
 {
 public:
     virtual ~Store() = default;
@@ -102,7 +101,7 @@ protected:
     Store &operator=(Store &&) = default;
 };
 
-class Dispatcher final
+export class Dispatcher final
 {
 public:
     static Dispatcher &instance()
@@ -137,13 +136,13 @@ private:
     Dispatcher()
     {
         thread_ = std::thread([dispatcher = this] () {
-                dispatcher->run();
+            dispatcher->run();
             });
     }
 
     Dispatcher(const Dispatcher &) = delete;
     Dispatcher(Dispatcher &&) = delete;
-    
+
     Dispatcher &operator=(const Dispatcher &) = delete;
     Dispatcher &operator=(Dispatcher &&) = delete;
 
@@ -208,4 +207,3 @@ private:
 };
 
 }
-#endif
