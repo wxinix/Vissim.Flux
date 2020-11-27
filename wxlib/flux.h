@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Wuping Xin
+Copyright 2020-2021 Wuping Xin
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,45 +23,48 @@ See the License for the specific
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <type_traits>
-#include <utility>
 #include <vector>
 
 namespace wxlib {
 namespace flux {
 
+// C++/17 SFINAE
 template<typename E>
 using is_scoped_enum = std::integral_constant<bool, std::is_enum_v<E> && !std::is_convertible_v<E, int>>;
+
+// C++/20 Concept
+template<typename E>
+concept ScopedEnum = std::is_enum_v<E> && !std::is_convertible_v<E, int>;
 
 class Action final
 {
 public:
-    template <class ScopedEnum, typename = std::enable_if_t<is_scoped_enum<ScopedEnum>::value>>
-    Action(ScopedEnum type, std::any &payload, bool error = false)
+    template <ScopedEnum T>
+    Action(T type, std::any &payload, bool error = false)
         : type_(static_cast<int>(type)), payload_(payload), error_(error)
     {
     }
 
-    template <class ScopedEnum, typename = std::enable_if_t<is_scoped_enum<ScopedEnum>::value>>
-    Action(ScopedEnum type, std::any &&payload = std::any(), bool error = false)
+    template <ScopedEnum T>
+    Action(T type, std::any &&payload = std::any(), bool error = false)
         : type_(static_cast<int>(type)), payload_(std::move(payload)), error_(error)
     {
     }
 
-    Action(const Action &) = default;
-    Action(Action &&) = default;
+    Action(const Action&) = default;
+    Action(Action&&) = default;
     ~Action() = default;
 
-    Action &operator=(const Action &) = default;
-    Action &operator=(Action &&) = default;
+    Action &operator=(const Action&) = default;
+    Action &operator=(Action&&) = default;
 
-    template <class ScopedEnum, typename = std::enable_if_t<is_scoped_enum<ScopedEnum>::value>>
+    template <ScopedEnum T>
     auto getType() const
     {
-        return static_cast<ScopedEnum>(type_);
+        return static_cast<T>(type_);
     }
 
-    template<class T>
+    template<typename T>
     auto getPayload() const
     {
         return std::any_cast<T>(payload_);
@@ -82,55 +85,56 @@ class Middleware
 {
 public:
     virtual ~Middleware() = default;
-    virtual std::shared_ptr<Action> process(const std::shared_ptr<Action> &action) = 0;
+    virtual void process(const std::shared_ptr<Action>& action) = 0;
 protected:
     Middleware() = default;
-    Middleware(const Middleware &) = default;
-    Middleware(Middleware &&) = default;
-    
-    Middleware &operator=(const Middleware &) = default;
-    Middleware &operator=(Middleware &&) = default;
+    Middleware(const Middleware&) = default;
+    Middleware(Middleware&&) = default;
+
+    Middleware &operator=(const Middleware&) = default;
+    Middleware &operator=(Middleware&&) = default;
 };
 
 class Store
 {
 public:
     virtual ~Store() = default;
-    virtual void process(const std::shared_ptr<Action> &action) = 0;
+    virtual void process(const std::shared_ptr<Action>& action) = 0;
 protected:
     Store() = default;
-    Store(const Store &) = default;
-    Store(Store &&) = default;
-    Store &operator=(const Store &) = default;
-    Store &operator=(Store &&) = default;
+    Store(const Store&) = default;
+    Store(Store&&) = default;
+    Store &operator=(const Store&) = default;
+    Store &operator=(Store&&) = default;
 };
 
 class Dispatcher final
 {
 public:
-    static Dispatcher &instance()
+    static Dispatcher& instance()
     {
         static Dispatcher self;
         return self;
     }
 
-    template <class... Args>
-    void registerMiddleware(Args&&... args)
+    template <typename... Ts>
+    void registerMiddleware(Ts&&... args)
     {
-        middlewares_.emplace_back(std::forward<Args>(args)...);
+        middlewares_.emplace_back(std::forward<Ts>(args)...);
     }
 
-    template <class... Args>
-    void registerStore(Args&&... args)
+    template <typename... Ts>
+    void registerStore(Ts&&... args)
     {
-        stores_.emplace_back(std::forward<Args>(args)...);
+        stores_.emplace_back(std::forward<Ts>(args)...);
     }
 
-    template <class... Args>
-    void dispatch(Args&&... args)
+    template <typename... Ts>
+    void dispatch(Ts&&... args)
     {
-        std::unique_lock<std::mutex> lock(mutex_);
-        actions_.emplace(std::forward<Args>(args)...);
+        std::unique_lock<std::mutex> lk(mutex_);
+        actions_.emplace(std::forward<Ts>(args)...);
+        lk.unlock();
 
         wake_ = true;
         condition_.notify_one();
@@ -139,16 +143,14 @@ public:
 private:
     Dispatcher()
     {
-        thread_ = std::thread([dispatcher = this] () {
-                dispatcher->run();
-            });
+        thread_ = std::thread([=] { this->run(); });
     }
 
-    Dispatcher(const Dispatcher &) = delete;
-    Dispatcher(Dispatcher &&) = delete;
-    
-    Dispatcher &operator=(const Dispatcher &) = delete;
-    Dispatcher &operator=(Dispatcher &&) = delete;
+    Dispatcher(const Dispatcher&) = delete;
+    Dispatcher(Dispatcher&&) = delete;
+
+    Dispatcher &operator=(const Dispatcher&) = delete;
+    Dispatcher &operator=(Dispatcher&&) = delete;
 
     ~Dispatcher()
     {
@@ -158,43 +160,45 @@ private:
 
     void run()
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> lk(mutex_);
 
-        while (true) {
-
+        while (!done_) {
             while (!wake_) {
-                condition_.wait(lock);
+                condition_.wait(lk);
             }
 
             while (!actions_.empty()) {
-                auto action = actions_.front();
-                lock.unlock();
+                const auto& action = actions_.front();                
+                lk.unlock();
 
-                for (const auto &middleware : middlewares_) {
-                    action = middleware->process(action);
+                for (const auto& middleware: middlewares_) {
+                    if (done_) break;
+                    middleware->process(action);
                 }
 
-                for (const auto &store : stores_) {
+                for (const auto& store: stores_) {
+                    if (done_) break;
                     store->process(action);
                 }
 
-                lock.lock();
-                actions_.pop();
+                lk.lock();
+                // action is a lvalue reference of the shared_ptr. If pop right after actions_.front(), '
+                // the shared_ptr object will be prematurely released.
+                actions_.pop(); 
             }
 
             wake_ = false;
-
-            if (done_) {
-                break;
-            }
         }
     }
 
     void stop()
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> lk(mutex_);
         done_ = true;
-        wake_ = true;
+        wake_ = true;        
+        actions_ = { };
+        lk.unlock();
+        
         condition_.notify_one();
     }
 
@@ -202,8 +206,8 @@ private:
     std::vector<std::shared_ptr<Middleware>> middlewares_;
     std::vector<std::shared_ptr<Store>> stores_;
 
-    std::atomic_bool wake_;
-    std::atomic_bool done_;
+    std::atomic_bool wake_{false};
+    std::atomic_bool done_{false};
     std::mutex mutex_;
     std::condition_variable condition_;
 

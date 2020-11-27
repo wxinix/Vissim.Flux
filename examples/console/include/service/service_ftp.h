@@ -10,13 +10,13 @@ public:
 	FtpService() = default;
 	~FtpService() = default;
 
-	void onUploadFtp(std::string &&filename);
+	void onUploadFtp(std::string&& filename);
 private:
-	FtpService(const FtpService &) = delete;
-	FtpService(FtpService &&) = delete;
+	FtpService(const FtpService&) = delete;
+	FtpService(FtpService&&) = delete;
 	
-	FtpService& operator=(const FtpService &) = delete;
-	FtpService& operator=(FtpService &&) = delete;
+	FtpService& operator=(const FtpService&) = delete;
+	FtpService& operator=(FtpService&&) = delete;
 
 	std::future<void> future_;
 };

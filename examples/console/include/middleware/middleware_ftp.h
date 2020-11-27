@@ -5,19 +5,19 @@
 #include <wxlib/flux.h>
 #include <action/action_types.h>
 
-class FtpMiddleware final : public wxlib::flux::Middleware
+class FtpMiddleware final: public wxlib::flux::Middleware
 {
 public:
 	FtpMiddleware();
 	~FtpMiddleware();
 
-	std::shared_ptr<wxlib::flux::Action> process(const std::shared_ptr<wxlib::flux::Action> &action) override;
+	void process(const std::shared_ptr<wxlib::flux::Action>& action) override;
 private:
-	FtpMiddleware(const FtpMiddleware &) = delete;
-	FtpMiddleware(FtpMiddleware &&) = delete;
+	FtpMiddleware(const FtpMiddleware&) = delete;
+	FtpMiddleware(FtpMiddleware&&) = delete;
 	
-	FtpMiddleware& operator=(const FtpMiddleware &) = delete;
-	FtpMiddleware& operator=(FtpMiddleware &&) = delete;
+	FtpMiddleware& operator=(const FtpMiddleware&) = delete;
+	FtpMiddleware& operator=(FtpMiddleware&&) = delete;
 
 	class FtpMiddlewareImpl;
 	std::unique_ptr<FtpMiddlewareImpl> impl_;
